@@ -27,8 +27,8 @@ plot.line('x', 'y3', source=source, line_width=1, line_alpha=0.6)
 
 # Set up widgets
 
-fir = Slider(title="k1", value=1.0, start=0.0, end=1.0, step=0.01)
-sec = Slider(title="k2", value=1.0, start=0.0, end=1.0, step=0.01)
+fir = Slider(title="k1", value=0.1000000001, start=0.001, end=1, step=0.01)
+sec = Slider(title="k2", value=0.2, start=0.001, end=1, step=0.01)
 
 # Set up callbacks
 
