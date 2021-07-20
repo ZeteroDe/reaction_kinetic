@@ -1,89 +1,60 @@
-from os.path import join, dirname
-import datetime
+import numpy as np
 
-import pandas as pd
-from scipy.signal import savgol_filter
-
-from bokeh.io import curdoc
-from bokeh.layouts import row, column
-from bokeh.models import ColumnDataSource, DataRange1d, Select
-from bokeh.palettes import Blues4
+from bokeh.io import curdoc, output_file, show
+from bokeh.layouts import column, row
+from bokeh.models import ColumnDataSource, Slider, TextInput
 from bokeh.plotting import figure
 
-STATISTICS = ['record_min_temp', 'actual_min_temp', 'average_min_temp', 'average_max_temp', 'actual_max_temp', 'record_max_temp']
 
-def get_dataset(src, name, distribution):
-    df = src[src.airport == name].copy()
-    del df['airport']
-    df['date'] = pd.to_datetime(df.date)
-    # timedelta here instead of pd.DateOffset to avoid pandas bug < 0.18 (Pandas issue #11925)
-    df['left'] = df.date - datetime.timedelta(days=0.5)
-    df['right'] = df.date + datetime.timedelta(days=0.5)
-    df = df.set_index(['date'])
-    df.sort_index(inplace=True)
-    if distribution == 'Smoothed':
-        window, order = 51, 3
-        for key in STATISTICS:
-            df[key] = savgol_filter(df[key], window, order)
+output_file("bar_dodged.html")
+# Set up data
+N=100
+A=100
+x = np.linspace(0, N, num=100) #num= Anzahl der zahlen, N= letzte zahl
+y = A*np.exp(-0.1*x)
+y2= (0.1*A*(np.exp(-0.1*x)-np.exp(-0.2*x)))/(0.2-0.1)
+y3= A*(1+(0.1*np.exp(-0.2*x)-0.2*np.exp(-0.1*x))/(0.2-0.1))
+source = ColumnDataSource(data=dict(x=x, y=y, y2=y2, y3=y3))
 
-    return ColumnDataSource(data=df)
 
-def make_plot(source, title):
-    plot = figure(x_axis_type="datetime", plot_width=800, tools="", toolbar_location=None)
-    plot.title.text = title
+# Set up plot
+plot = figure(height=400, width=400, title="Reaction network",
+              tools="crosshair,pan,reset,save,wheel_zoom",
+              x_range=[0, 100], y_range=[0, 101])
 
-    plot.quad(top='record_max_temp', bottom='record_min_temp', left='left', right='right',
-              color=Blues4[2], source=source, legend="Record")
-    plot.quad(top='average_max_temp', bottom='average_min_temp', left='left', right='right',
-              color=Blues4[1], source=source, legend="Average")
-    plot.quad(top='actual_max_temp', bottom='actual_min_temp', left='left', right='right',
-              color=Blues4[0], alpha=0.5, line_color="black", source=source, legend="Actual")
+plot.line('x', 'y',  source=source, line_width=1, line_alpha=0.6)
+plot.line('x', 'y2', source=source, line_width=1, line_alpha=0.6)
+plot.line('x', 'y3', source=source, line_width=1, line_alpha=0.6)
 
-    # fixed attributes
-    plot.xaxis.axis_label = None
-    plot.yaxis.axis_label = "Temperature (F)"
-    plot.axis.axis_label_text_font_style = "bold"
-    plot.x_range = DataRange1d(range_padding=0.0)
-    plot.grid.grid_line_alpha = 0.3
+# Set up widgets
 
-    return plot
+fir = Slider(title="k1", value=1.0, start=0.0, end=1.0, step=0.01)
+sec = Slider(title="k2", value=1.0, start=0.0, end=1.0, step=0.01)
 
-def update_plot(attrname, old, new):
-    city = city_select.value
-    plot.title.text = "Weather data for " + cities[city]['title']
+# Set up callbacks
 
-    src = get_dataset(df, cities[city]['airport'], distribution_select.value)
-    source.data.update(src.data)
+def update_data(attrname, old, new):
 
-city = 'Austin'
-distribution = 'Discrete'
+    # Get the current slider values
+    k = fir.value
+    kk = sec.value
 
-cities = {
-    'Austin': {
-        'airport': 'AUS',
-        'title': 'Austin, TX',
-    },
-    'Boston': {
-        'airport': 'BOS',
-        'title': 'Boston, MA',
-    },
-    'Seattle': {
-        'airport': 'SEA',
-        'title': 'Seattle, WA',
-    }
-}
+    # Generate the new curve
+    x = np.linspace(0, N, num=100) #num= Anzahl der zahlen, N= letzte zahl
+    y = A*np.exp(-k*x)
+    y2= (k*A*(np.exp(-k*x)-np.exp(-kk*x)))/(kk-k)
+    y3= A*(1+(k*np.exp(-kk*x)-kk*np.exp(-k*x))/(kk-k))
 
-city_select = Select(value=city, title='City', options=sorted(cities.keys()))
-distribution_select = Select(value=distribution, title='Distribution', options=['Discrete', 'Smoothed'])
+    source.data = dict(x=x, y=y, y2=y2, y3=y3)
 
-df = pd.read_csv(join(dirname(__file__), 'data/2015_weather.csv'))
-source = get_dataset(df, cities[city]['airport'], distribution)
-plot = make_plot(source, "Weather data for " + cities[city]['title'])
+for w in [fir, sec]:
+    w.on_change('value', update_data)
 
-city_select.on_change('value', update_plot)
-distribution_select.on_change('value', update_plot)
 
-controls = column(city_select, distribution_select)
+# Set up layouts and add to document
+inputs = column(fir, sec)
 
-curdoc().add_root(row(plot, controls))
-curdoc().title = "Weather"
+curdoc().add_root(row(inputs, plot, width=800))
+curdoc().title = "Sliders"
+
+show(plot)
