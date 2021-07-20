@@ -6,7 +6,6 @@ from bokeh.models import ColumnDataSource, Slider, TextInput
 from bokeh.plotting import figure
 
 
-output_file("bar_dodged.html")
 # Set up data
 N=100
 A=100
@@ -57,4 +56,4 @@ inputs = column(fir, sec)
 curdoc().add_root(row(inputs, plot, width=800))
 curdoc().title = "Sliders"
 
-show(plot)
+
